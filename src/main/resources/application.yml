@@ -1,0 +1,2 @@
+elasticsearch:
+       cluster-nodes: 127.0.0.1:9200  #多个节点以逗号隔开
