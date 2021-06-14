@@ -19,6 +19,8 @@ import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.core.CountRequest;
+import org.elasticsearch.client.core.CountResponse;
 import org.elasticsearch.client.indices.*;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.common.Strings;
@@ -56,21 +58,23 @@ public class SpringbootEsApplicationTests {
 
 	@Test
 	public void testCreateIndex() throws IOException {
-		CreateIndexRequest request = new CreateIndexRequest("book");
+		CreateIndexRequest request = new CreateIndexRequest("test1");
 		request.settings(Settings.builder()
 				.put("index.number_of_shards", 5)
 				.put("index.number_of_replicas", 1)
 		);
 
-		Map<String, Object> message = new HashMap<>();
-		message.put("type", "text");
 		Map<String, Object> properties = new HashMap<>();
-		properties.put("message", message);
 		Map<String, Object> mapping = new HashMap<>();
 		mapping.put("properties", properties);
 		request.mapping(mapping);
 
 		CreateIndexResponse createIndexResponse = client.indices().create(request, RequestOptions.DEFAULT);
+		if (createIndexResponse.isAcknowledged() && createIndexResponse.isShardsAcknowledged()){
+			System.out.println(true);
+		} else {
+			System.out.println(false);
+		}
 		System.out.println(createIndexResponse.toString());
 	}
 
@@ -79,7 +83,7 @@ public class SpringbootEsApplicationTests {
 	 */
 	@Test
 	public void testCreateIndex2() throws IOException {
-		CreateIndexRequest request = new CreateIndexRequest("kang");
+		CreateIndexRequest request = new CreateIndexRequest("test");
 		request.settings(Settings.builder()
 				.put("index.number_of_shards", 5)
 				.put("index.number_of_replicas", 1)
@@ -90,11 +94,6 @@ public class SpringbootEsApplicationTests {
 		{
 			builder.startObject("properties");
 			{
-				builder.startObject("message");
-				{
-					builder.field("type", "text");
-				}
-				builder.endObject();
 			}
 			builder.endObject();
 		}
@@ -111,7 +110,7 @@ public class SpringbootEsApplicationTests {
 	 */
 	@Test
 	public void testDeleteIndex() throws IOException {
-		DeleteIndexRequest request = new DeleteIndexRequest("book");
+		DeleteIndexRequest request = new DeleteIndexRequest("test1");
 		AcknowledgedResponse deleteIndexResponse = client.indices().delete(request, RequestOptions.DEFAULT);
 		System.out.println(deleteIndexResponse.isAcknowledged());
 	}
@@ -133,11 +132,11 @@ public class SpringbootEsApplicationTests {
 	@Test
 	public void testGetMapping() throws IOException {
 		GetMappingsRequest request = new GetMappingsRequest();
-		request.indices("book");
+		request.indices("test");
 		GetMappingsResponse getMappingResponse = client.indices().getMapping(request, RequestOptions.DEFAULT);
 
 		Map<String, MappingMetaData> allMappings = getMappingResponse.mappings();
-		MappingMetaData indexMapping = allMappings.get("book");
+		MappingMetaData indexMapping = allMappings.get("test");
 		Map<String, Object> mapping = indexMapping.sourceAsMap();
 
 		for(String s:mapping.keySet()){
@@ -175,10 +174,10 @@ public class SpringbootEsApplicationTests {
 			jsonMap.put("number", 15L);
 			jsonMap.put("create_time", new Date());
 			jsonMap.put("price", 356.5d);
-			jsonMap.put("name", "kraken");
+			jsonMap.put("name", "zhang");
 			jsonMap.put("title", "测试数据00");
-			IndexRequest indexRequest = new IndexRequest("book")
-					.id(String.valueOf(1112)).source(jsonMap);
+			IndexRequest indexRequest = new IndexRequest("test").id("gZpUC3oB_7z_Coizt5ni")
+					.source(jsonMap);
 			IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
 			log.info("indexResponse:{}",indexResponse.toString());
 
@@ -249,7 +248,7 @@ public class SpringbootEsApplicationTests {
 	 */
 	@Test
 	public void testUpdateDocument() throws IOException {
-		UpdateRequest request = new UpdateRequest("yuan", "8")
+		UpdateRequest request = new UpdateRequest("test", "gZpUC3oB_7z_Coizt5ni")
 				.doc("name","测试一下(update)","title","我(update)就是在测试更新3");
 		UpdateResponse updateResponse = client.update(
 				request, RequestOptions.DEFAULT);
@@ -276,7 +275,7 @@ public class SpringbootEsApplicationTests {
 	 */
 	@Test
 	public void testDeleteDocument() throws IOException {
-		DeleteRequest request = new DeleteRequest("yuan", "8");
+		DeleteRequest request = new DeleteRequest("test", "gZpUC3oB_7z_Coizt5ni");
 		DeleteResponse deleteResponse = client.delete(request, RequestOptions.DEFAULT);
 		log.info("deleteResponse:{}",deleteResponse);
 	}
@@ -286,14 +285,21 @@ public class SpringbootEsApplicationTests {
 	 */
 	@Test
 	public void testSearch() throws IOException {
-		SearchRequest searchRequest = new SearchRequest("yuan");
+		SearchRequest searchRequest = new SearchRequest("book");
 		SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-		searchSourceBuilder.query(QueryBuilders.matchQuery("name","测试一下11"));
+		searchSourceBuilder.query(QueryBuilders.matchQuery("name","hua"));
 		searchRequest.source(searchSourceBuilder);
 		SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
 		float maxScore = searchResponse.getHits().getMaxScore();
 		TotalHits totalHits = searchResponse.getHits().getTotalHits();
 		SearchHit[] hits = searchResponse.getHits().getHits();
+
+		CountRequest countRequest = new CountRequest("book");
+		SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+		sourceBuilder.query(QueryBuilders.matchQuery("name","hua"));
+		countRequest.source(sourceBuilder);
+		long totalCount = client.count(countRequest, RequestOptions.DEFAULT).getCount();
+		log.info("totalCount : {}",totalCount );
 
 
 		for (SearchHit hit : hits) {
@@ -337,7 +343,7 @@ public class SpringbootEsApplicationTests {
 	@Test
 	public void testSearchHighPage(){
 		try {
-			List<Map<String,Object>> list = this.searchHighPage("hua",0,20);
+			List<Map<String,Object>> list = this.searchHighPage("",0,20);
 			System.out.println(list);
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -358,19 +364,25 @@ public class SpringbootEsApplicationTests {
 		sourceBuilder.size(size);
 
 		//精准匹配关键字
-//		TermQueryBuilder termQuery = QueryBuilders.termQuery("title", keyWord);
-//		sourceBuilder.query(termQuery);
-//		sourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
-		//高亮
-//		HighlightBuilder highlightBuilder = new HighlightBuilder();
-//		highlightBuilder.field(new HighlightBuilder.Field("title"));
-//		highlightBuilder.requireFieldMatch(false);
-//		highlightBuilder.preTags("<span style='color:red'>");
-//		highlightBuilder.postTags("</span>");
-//		sourceBuilder.highlighter(highlightBuilder);
+		TermQueryBuilder termQuery = QueryBuilders.termQuery("name", keyWord);
+		sourceBuilder.query(termQuery);
+		sourceBuilder.timeout(new TimeValue(60, TimeUnit.SECONDS));
+		HighlightBuilder highlightBuilder = new HighlightBuilder();
+		highlightBuilder.field(new HighlightBuilder.Field("name"));
+		highlightBuilder.requireFieldMatch(false);
+		highlightBuilder.preTags("<span style='color:red'>");
+		highlightBuilder.postTags("</span>");
+		sourceBuilder.highlighter(highlightBuilder);
 
 		searchRequest.source(sourceBuilder);
 		SearchResponse response = client.search(searchRequest, RequestOptions.DEFAULT);
+
+		CountRequest countRequest = new CountRequest("book");
+		SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+		searchSourceBuilder.query(termQuery);
+		countRequest.source(searchSourceBuilder);
+		long totalCount = client.count(countRequest, RequestOptions.DEFAULT).getCount();
+		log.info("totalCount : {}",totalCount );
 
 		ArrayList<Map<String,Object>> list = new ArrayList<>();
 		//解析结果
